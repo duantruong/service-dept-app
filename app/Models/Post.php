@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class Post extends Model
 {
@@ -57,8 +58,10 @@ class Post extends Model
      */
     public static function authenticate($email, $password)
     {
+        //Log::error('Email !' . $email . ' Password !' . $password);
+        Log::error("in authenticate");
         $user = self::where('email', $email)->first();
-
+        Log::error(print_r($user, true));
         if ($user) {
             // Check if password is hashed (starts with $2y$)
             if (str_starts_with($user->password, '$2y$')) {
