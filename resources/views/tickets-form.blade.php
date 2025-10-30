@@ -1,20 +1,21 @@
-@extends('layouts/default')
+<!doctype html>
+<html>
 
-@section('maincontent')
-    <div class="container mt-5">
-        <h1>Upload Excel File</h1>
-        <p>Upload an Excel file (.xlsx or .xls) to generate a ticket chart.</p>
+<head>
+    <meta charset="utf-8">
+    <title>Upload tickets</title>
+</head>
 
-        <form action="{{ route('tickets.upload') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="mb-3">
-                <label for="file" class="form-label">Select Excel File</label>
-                <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
-                <div class="form-text">Max file size: 20MB</div>
-            </div>
+<body>
+    <h1>Upload XLSX</h1>
+    @if ($errors->any())
+        <div style="color:red">@foreach ($errors->all() as $e) <div>{{ $e }}</div> @endforeach</div>
+    @endif
+    <form method="post" action="{{ route('tickets.upload') }}" enctype="multipart/form-data">
+        @csrf
+        <input type="file" name="file" accept=".xlsx,.xls" required>
+        <button>Generate chart</button>
+    </form>
+</body>
 
-            <button type="submit" class="btn btn-primary">Upload and Generate Chart</button>
-            <a href="{{ route('home') }}" class="btn btn-secondary">Back to Home</a>
-        </form>
-    </div>
-@endsection
+</html>
