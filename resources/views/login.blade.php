@@ -1,4 +1,4 @@
-@extends('layouts/default')
+@extends('layouts.default')
 
 @section('maincontent')
     <div class="d-flex flex-column align-items-center position-relative">
@@ -46,18 +46,5 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const errorAlert = document.getElementById('errorAlert');
-            if (errorAlert) {
-                setTimeout(function () {
-                    errorAlert.style.transition = 'opacity 0.5s ease-out';
-                    errorAlert.style.opacity = '0';
-                    setTimeout(function () {
-                        errorAlert.remove();
-                    }, 500);
-                }, 5000);
-            }
-        });
-    </script>
+
 @endsection
