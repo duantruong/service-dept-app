@@ -9,13 +9,15 @@ use Maatwebsite\Excel\Facades\Excel;
 class TicketChartService
 {
     /**
-     * Process Excel file and generate chart data
+     * Process Excel file and generate weekly chart data with pagination
      *
      * @param mixed $file
+     * @param string|null $startDate Optional start date filter (Y-m-d format)
+     * @param string|null $endDate Optional end date filter (Y-m-d format)
      * @return array
      * @throws \Exception
      */
-    public function processExcelFile($file): array
+    public function processExcelFile($file, $startDate = null, $endDate = null): array
     {
         $sheet = Excel::toCollection(null, $file)->first(); // first worksheet
 
@@ -41,85 +43,166 @@ class TicketChartService
         [$createdLabel, $createdIdx] = $findHeader(['ticket date created', 'date created', 'created']);
         [$resolvedLabel, $resolvedIdx] = $findHeader(['resolution date/time', 'resolution date', 'resolved', 'closed']);
 
-        if ($createdIdx === null && $resolvedIdx === null) {
-            throw new \Exception('Could not find Ticket Date Created or Resolution Date/Time columns.');
+        if ($createdIdx === null) {
+            throw new \Exception('Could not find Ticket Date Created column.');
         }
 
-        $parse = fn($v) => Carbon::parse($v, null)->startOfSecond();
+        // Improved date parsing function
+        $parse = function ($v) {
+            if (empty($v)) {
+                return null;
+            }
 
-        // Build daily aggregates
+            // Try PhpSpreadsheet date parsing first (for Excel date numbers)
+            if (is_numeric($v)) {
+                try {
+                    return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($v);
+                } catch (\Throwable $e) {
+                    // If not an Excel date number, continue with other methods
+                }
+            }
+
+            // Try Carbon parsing
+            try {
+                $date = Carbon::parse($v);
+                // Check if date is reasonable (not 1970 which indicates parsing failure)
+                if ($date->year >= 2000 && $date->year <= 2100) {
+                    return $date;
+                }
+            } catch (\Throwable $e) {
+            }
+
+            return null;
+        };
+
+        // Helper to check if date is within range
+        $isInDateRange = function ($date) use ($startDate, $endDate) {
+            if ($startDate && $date->lt(Carbon::parse($startDate)->startOfDay())) {
+                return false;
+            }
+            if ($endDate && $date->gt(Carbon::parse($endDate)->endOfDay())) {
+                return false;
+            }
+            return true;
+        };
+
+        // Helper to get week start date (Monday of the week)
+        $getWeekStart = fn($date) => $date->copy()->startOfWeek(Carbon::MONDAY)->toDateString();
+
+        // Build daily aggregates (for daily view) and weekly aggregates
         $createdDaily = [];
         $resolvedDaily = [];
+        $createdWeekly = [];
+        $resolvedWeekly = [];
 
         foreach ($rows as $r) {
             $r = collect($r);
+
+            // Count tickets created by day and week (only 2025)
             if ($createdIdx !== null && ($val = $r->get($createdIdx)) !== null && $val !== '') {
                 try {
-                    $d = $parse($val)->toDateString();
-                    $createdDaily[$d] = ($createdDaily[$d] ?? 0) + 1;
+                    $dateObj = $parse($val);
+                    if ($dateObj) {
+                        $date = Carbon::instance($dateObj)->startOfDay();
+                        // Only include dates from 2025 and within date range
+                        if ($date->year === 2025 && $isInDateRange($date)) {
+                            $dayKey = $date->toDateString();
+                            $weekStart = $getWeekStart($date);
+
+                            $createdDaily[$dayKey] = ($createdDaily[$dayKey] ?? 0) + 1;
+                            $createdWeekly[$weekStart] = ($createdWeekly[$weekStart] ?? 0) + 1;
+                        }
+                    }
                 } catch (\Throwable $e) {
                 }
             }
+
+            // Count tickets resolved by day and week (only 2025)
             if ($resolvedIdx !== null && ($val = $r->get($resolvedIdx)) !== null && $val !== '') {
                 try {
-                    $d = $parse($val)->toDateString();
-                    $resolvedDaily[$d] = ($resolvedDaily[$d] ?? 0) + 1;
+                    $dateObj = $parse($val);
+                    if ($dateObj) {
+                        $date = Carbon::instance($dateObj)->startOfDay();
+                        // Only include dates from 2025 and within date range
+                        if ($date->year === 2025 && $isInDateRange($date)) {
+                            $dayKey = $date->toDateString();
+                            $weekStart = $getWeekStart($date);
+
+                            $resolvedDaily[$dayKey] = ($resolvedDaily[$dayKey] ?? 0) + 1;
+                            $resolvedWeekly[$weekStart] = ($resolvedWeekly[$weekStart] ?? 0) + 1;
+                        }
+                    }
                 } catch (\Throwable $e) {
                 }
             }
         }
 
-        $allDays = collect(array_unique(array_merge(array_keys($createdDaily), array_keys($resolvedDaily))))
+        // Get all unique weeks and sort them
+        $allWeeks = collect(array_unique(array_merge(array_keys($createdWeekly), array_keys($resolvedWeekly))))
+            ->map(fn($d) => Carbon::parse($d))
             ->sort()
+            ->map(fn($d) => $d->toDateString())
             ->values();
 
-        $categories = $allDays->all();
-        $series = [
-            ['name' => 'Tickets Created', 'data' => $allDays->map(fn($d) => (int) ($createdDaily[$d] ?? 0))->all()],
-            ['name' => 'Tickets Resolved', 'data' => $allDays->map(fn($d) => (int) ($resolvedDaily[$d] ?? 0))->all()],
-        ];
+        // If no weeks found, return empty structure
+        if ($allWeeks->isEmpty()) {
+            return [
+                'weeks' => [],
+                'totalWeeks' => 0
+            ];
+        }
 
-        // Optional: average resolution hours by creation day
-        $avgResSeries = null;
-        if ($createdIdx !== null && $resolvedIdx !== null) {
-            $buckets = [];
-            foreach ($rows as $r) {
-                $r = collect($r);
-                $c = $r->get($createdIdx);
-                $res = $r->get($resolvedIdx);
-                if ($c && $res) {
-                    try {
-                        $cd = $parse($c);
-                        $rd = $parse($res);
-                        $day = $cd->toDateString();
-                        $hours = max(0, $rd->diffInSeconds($cd)) / 3600.0;
-                        $buckets[$day][] = $hours;
-                    } catch (\Throwable $e) {
-                    }
-                }
-            }
-            if ($buckets) {
-                $avg = [];
-                foreach ($allDays as $d) {
-                    $vals = $buckets[$d] ?? [];
-                    $avg[] = $vals ? array_sum($vals) / count($vals) : null;
-                }
-                $avgResSeries = [
-                    'name' => 'Avg Resolution Hours (by creation day)',
-                    'type' => 'spline',
-                    'yAxis' => 1,
-                    'tooltip' =>
-                        ['valueDecimals' => 1],
-                    'data' => $avg
+        // Build weekly data with ticket counts and daily breakdown
+        $weeklyData = [];
+        $runningTotal = 0;
+
+        foreach ($allWeeks as $weekStart) {
+            $created = (int) ($createdWeekly[$weekStart] ?? 0);
+            $resolved = (int) ($resolvedWeekly[$weekStart] ?? 0);
+
+            $runningTotal += $created - $resolved;
+
+            $start = Carbon::parse($weekStart);
+            $end = $start->copy()->endOfWeek(Carbon::SUNDAY);
+
+            // Build daily data for this week (Monday to Sunday)
+            $dailyData = [];
+            $dayRunningTotal = $runningTotal - $created + $resolved; // Start with total before this week
+
+            for ($day = 0; $day < 7; $day++) {
+                $currentDay = $start->copy()->addDays($day);
+                $dayKey = $currentDay->toDateString();
+                $dayCreated = (int) ($createdDaily[$dayKey] ?? 0);
+                $dayResolved = (int) ($resolvedDaily[$dayKey] ?? 0);
+
+                $dayRunningTotal += $dayCreated - $dayResolved;
+
+                $dailyData[] = [
+                    'day' => $currentDay->format('D'), // Mon, Tue, Wed, etc.
+                    'dayFull' => $currentDay->format('l'), // Monday, Tuesday, etc.
+                    'date' => $currentDay->format('M j'), // Jan 1
+                    'dateFull' => $dayKey,
+                    'created' => $dayCreated,
+                    'resolved' => $dayResolved,
+                    'totalTickets' => $dayRunningTotal,
                 ];
             }
+
+            $weeklyData[] = [
+                'weekStart' => $weekStart,
+                'weekLabel' => $start->format('M j') . ' - ' . $end->format('M j, Y'),
+                'created' => $created,
+                'resolved' => $resolved,
+                'totalTickets' => $runningTotal,
+                'weekStartFormatted' => $start->format('Y-m-d'),
+                'weekEndFormatted' => $end->format('Y-m-d'),
+                'dailyData' => $dailyData,
+            ];
         }
 
         return [
-            'categories' => $categories,
-            'series' => $avgResSeries ? array_merge($series, [$avgResSeries]) : $series,
-            'xTitle' => 'Date',
-            'yTitle' => 'Count'
+            'weeks' => $weeklyData,
+            'totalWeeks' => count($weeklyData)
         ];
     }
 }
