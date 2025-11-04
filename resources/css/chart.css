@@ -1,0 +1,99 @@
+/* Chart page specific styles */
+.filter-card {
+    width: 99%;
+    max-width: none;
+    border-radius: 1rem;
+    background-color: #f8f9fa;
+    border: 2px solid var(--brand-blue);
+}
+
+.filter-header {
+    color: var(--brand-blue);
+}
+
+.filter-label {
+    color: var(--brand-blue);
+}
+
+.filtered-info {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background-color: white;
+    border-radius: 0.25rem;
+}
+
+.chart-card {
+    width: 99%;
+    max-width: none;
+    border-radius: 1rem;
+    background-color: #ffffff;
+    margin: 0.5% auto;
+}
+
+.chart-header {
+    flex: 1;
+}
+
+.chart-spacer {
+    width: 120px;
+}
+
+.week-label {
+    color: var(--brand-blue);
+}
+
+.chart-container {
+    height: 400px;
+    width: 100%;
+}
+
+.week-badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.week-dropdown {
+    min-width: 250px;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.week-dropdown .dropdown-item {
+    white-space: normal;
+    padding: 0.5rem 1rem;
+}
+
+.week-dropdown .dropdown-item.active {
+    background-color: var(--brand-blue);
+    color: white;
+}
+
+.week-dropdown .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.week-dropdown .dropdown-item.active:hover {
+    background-color: var(--brand-blue);
+    opacity: 0.9;
+}
+
+/* Custom scrollbar for dropdown */
+.week-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.week-dropdown::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.week-dropdown::-webkit-scrollbar-thumb {
+    background: var(--brand-blue);
+    border-radius: 4px;
+}
+
+.week-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #002a54;
+}
+

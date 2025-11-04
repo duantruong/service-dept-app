@@ -1,0 +1,44 @@
+/* Form page styles */
+.login-card,
+.upload-card {
+    width: 22rem;
+    border-radius: 1rem;
+    background-color: #ffffff;
+}
+
+.error-alert {
+    position: absolute;
+    top: -80px;
+    width: 22rem;
+    z-index: 1000;
+}
+
+.logo-container {
+    width: 18rem;
+}
+
+.logo-img {
+    max-height: 80px;
+    width: auto;
+}
+
+.form-label-custom {
+    color: var(--brand-blue);
+}
+
+.file-upload-label {
+    cursor: pointer;
+}
+
+.file-name {
+    display: inline-block;
+}
+
+.welcome-title {
+    font-size: 1.5rem;
+}
+
+.upload-instruction {
+    color: var(--brand-blue);
+}
+
