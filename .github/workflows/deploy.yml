@@ -1,0 +1,71 @@
+name: Deploy to EC2 (SSH)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build assets (optional)
+        run: |
+          if [ -f package.json ]; then
+            corepack enable || true
+            npm ci
+            npm run build
+          fi
+
+      - name: Create deploy bundle
+        run: |
+          tar -czf deploy.tar.gz \
+            --exclude=.git --exclude=node_modules --exclude=.github .
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          printf "Host ec2\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n" \
+            "${{ secrets.EC2_HOST }}" "${{ secrets.EC2_USER }}" "${{ secrets.EC2_SSH_PORT || 22 }}" >> ~/.ssh/config
+
+      - name: Upload bundle
+        run: scp -q deploy.tar.gz ec2:${{ secrets.EC2_PATH }}
+
+      - name: Deploy on EC2
+        run: |
+          ssh ec2 <<'EOF'
+          set -e
+          cd ${{ secrets.EC2_PATH }}
+          tar -xzf deploy.tar.gz && rm deploy.tar.gz
+
+          # ---- Docker (if present) ----
+          if command -v docker >/dev/null 2>&1 && [ -f docker-compose.yml ]; then
+            docker compose pull || true
+            docker compose up -d --build
+            docker image prune -f || true
+          fi
+
+          # ---- Laravel (non-Docker) ----
+          if [ -f artisan ]; then
+            composer install --no-dev --prefer-dist --no-interaction
+            php artisan migrate --force || true
+            php artisan config:cache || true
+            php artisan route:cache || true
+            sudo systemctl restart php*-fpm.service || true
+            sudo systemctl restart nginx || true
+          fi
+
+          # ---- Node + PM2 (non-Docker) ----
+          if [ -f ecosystem.config.js ] && command -v pm2 >/dev/null 2>&1; then
+            pm2 reload ecosystem.config.js || pm2 start ecosystem.config.js
+            pm2 save
+          fi
+          EOF
