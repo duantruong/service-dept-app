@@ -23,10 +23,12 @@ jobs:
             npm run build
           fi
 
-      - name: Create deploy bundle
+      - name: Create deploy bundle (tracked + dist)
         run: |
-          tar --warning=no-file-changed --ignore-failed-read -czf deploy.tar.gz \
-            --exclude=.git --exclude=node_modules --exclude=.github .
+          tar --warning=no-file-changed -czf deploy.tar.gz \
+            --exclude=.git --exclude=.github --exclude=node_modules \
+            dist .
+
 
       - name: Configure SSH
         run: |
