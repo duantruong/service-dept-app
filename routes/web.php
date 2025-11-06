@@ -22,4 +22,5 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/tickets/chart', [TicketChartController::class, 'upload'])->name('tickets.upload');
     Route::post('/tickets/chart/filter', [TicketChartController::class, 'filter'])->name('tickets.filter');
     Route::get('/tickets/chart/{week?}', [TicketChartController::class, 'showChart'])->name('tickets.chart');
+    Route::get('/tickets/list', [TicketChartController::class, 'getTickets'])->name('tickets.list');
 });

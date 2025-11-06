@@ -47,7 +47,10 @@
                         <button type="submit" class="btn btn-primary w-100">
                             Apply Filter
                         </button>
-                        @if(isset($dateFilter) && (($dateFilter['start_date'] ?? null) || ($dateFilter['end_date'] ?? null)))
+                        @if(
+                                isset($dateFilter) && (($dateFilter['start_date'] ?? null) || ($dateFilter['end_date'] ??
+                                    null))
+                            )
                             <a href="{{ route('tickets.chart', ['week' => $weekIndex]) }}?clear_filter=1"
                                 class="btn btn-outline-secondary w-100 mt-2">
                                 Clear Filter
@@ -88,7 +91,8 @@
 
             <div class="row mb-4">
                 <div class="col-md-4">
-                    <div class="card bg-primary text-white">
+                    <div class="card bg-primary text-white clickable-ticket-box" data-type="created"
+                        style="cursor: pointer;">
                         <div class="card-body text-center">
                             <h5>Tickets Created</h5>
                             <h2>{{ $currentWeek['created'] }}</h2>
@@ -96,7 +100,8 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card bg-danger text-white">
+                    <div class="card bg-danger text-white clickable-ticket-box" data-type="resolved"
+                        style="cursor: pointer;">
                         <div class="card-body text-center">
                             <h5>Tickets Resolved</h5>
                             <h2>{{ $currentWeek['resolved'] }}</h2>
@@ -104,10 +109,39 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-success text-white clickable-ticket-box" data-type="remaining"
+                        style="cursor: pointer;">
                         <div class="card-body text-center">
-                            <h5>Total Tickets</h5>
+                            <h5>Remaining Tickets</h5>
                             <h2>{{ $currentWeek['totalTickets'] }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ticket List Modal -->
+            <div class="modal fade" id="ticketModal" tabindex="-1" aria-labelledby="ticketModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="ticketModalLabel">Ticket List</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="ticketListLoading" class="text-center">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <div id="ticketListContent" style="display: none;">
+                                <ul class="list-group" id="ticketListItems"></ul>
+                            </div>
+                            <div id="ticketListEmpty" style="display: none;" class="alert alert-info">
+                                No tickets found.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
@@ -180,7 +214,11 @@
         <script>
             // Pass PHP data to JavaScript
             window.ticketChartData = @json($currentWeek);
+            window.isFiltered = {{ isset($isFiltered) && $isFiltered ? 'true' : 'false' }};
+            window.weekIndex = {{ $weekIndex }};
+            window.weekTickets = @json($weekTickets ?? []);
         </script>
         <script src="{{ asset('js/tickets-chart.js') }}"></script>
+        <script src="{{ asset('js/ticket-list.js') }}"></script>
     @endpush
 @endsection

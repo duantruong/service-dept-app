@@ -97,3 +97,28 @@
     background: #002a54;
 }
 
+/* Clickable ticket boxes */
+.clickable-ticket-box {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.clickable-ticket-box:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+.clickable-ticket-box:active {
+    transform: translateY(-2px);
+}
+
+/* Ticket list modal */
+#ticketListItems {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#ticketListItems .list-group-item {
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--brand-blue);
+}
+
