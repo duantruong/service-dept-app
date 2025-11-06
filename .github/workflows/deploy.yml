@@ -30,13 +30,19 @@ jobs:
             dist .
 
 
-      - name: Configure SSH
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           printf "Host ec2\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n" \
             "${{ secrets.EC2_HOST }}" "${{ secrets.EC2_USER }}" "${{ secrets.EC2_SSH_PORT || 22 }}" >> ~/.ssh/config
+
+      - name: Sync files to EC2 (no tar)
+        run: |
+          rsync -az --delete \
+            --exclude .git --exclude .github --exclude node_modules \
+            ./ ec2:${{ secrets.EC2_PATH }}/
 
       - name: Upload bundle
         run: scp -q deploy.tar.gz ec2:${{ secrets.EC2_PATH }}
