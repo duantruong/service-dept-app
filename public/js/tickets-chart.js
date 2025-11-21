@@ -1,5 +1,7 @@
 // Wait for DOM and Highcharts to be ready
-function initTicketChart() {
+
+function initTicketChart() { 
+    //let start = Date.now()
     try {
         // Get current week data from the page
         const currentWeekData = window.ticketChartData;
@@ -42,7 +44,8 @@ function initTicketChart() {
         const createdData = dailyData.map(day => day.created);
         const resolvedData = dailyData.map(day => day.resolved);
         const totalData = dailyData.map(day => day.totalTickets);
-
+        //let end = Date.time()
+        //console.log(end-start)
         // Render the chart
         Highcharts.chart('container', {
             chart: {
@@ -157,6 +160,7 @@ function initTicketChart() {
             container.innerHTML = '<div class="alert alert-danger text-center p-3">Error rendering chart: ' + error.message + '</div>';
         }
     }
+
 }
 
 // Wait for Highcharts to load, then initialize chart

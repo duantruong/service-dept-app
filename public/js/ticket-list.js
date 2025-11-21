@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // If we have week tickets data and not filtered, use it directly
         if (!isFiltered && weekTickets[type]) {
-            displayTickets(weekTickets[type]);
+            const tickets = Array.isArray(weekTickets[type]) ? weekTickets[type] : [];
+            displayTickets(tickets);
             return;
         }
 
@@ -52,8 +53,23 @@ document.addEventListener('DOMContentLoaded', function() {
             url.searchParams.append('weekTickets', JSON.stringify(weekTickets));
         }
 
-        fetch(url)
-            .then(response => response.json())
+        // Get CSRF token from meta tag
+        const csrfToken = document.head.querySelector('meta[name="csrf-token"]')?.content;
+
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken })
+            },
+            credentials: 'same-origin'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 displayTickets(data.tickets || []);
             })
@@ -79,10 +95,31 @@ document.addEventListener('DOMContentLoaded', function() {
         ticketListItems.innerHTML = '';
 
         tickets.forEach(ticket => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item';
-            li.textContent = ticket;
-            ticketListItems.appendChild(li);
+            const tr = document.createElement('tr');
+            
+            // Handle both old format (string) and new format (object with ticket and sn)
+            let ticketNum = '';
+            let ticketSn = '';
+            
+            if (typeof ticket === 'string') {
+                // Old format: just a string
+                ticketNum = ticket;
+            } else if (ticket && typeof ticket === 'object') {
+                // New format: object with details
+                ticketNum = ticket.ticket || '';
+                ticketSn = ticket.sn || '';
+            }
+            
+            // Create table cells
+            const tdTicket = document.createElement('td');
+            tdTicket.textContent = ticketNum;
+            tr.appendChild(tdTicket);
+            
+            const tdSn = document.createElement('td');
+            tdSn.textContent = ticketSn;
+            tr.appendChild(tdSn);
+            
+            ticketListItems.appendChild(tr);
         });
     }
 });

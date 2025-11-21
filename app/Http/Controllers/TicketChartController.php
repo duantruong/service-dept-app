@@ -218,6 +218,48 @@ class TicketChartController extends Controller
             $filteredTickets['resolved'] = array_unique($filteredTickets['resolved']);
             $filteredTickets['remaining'] = array_unique($filteredTickets['remaining']);
 
+            // Convert to detailed format with S/N
+            $filteredTicketsDetailed = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => []
+            ];
+
+            foreach ($filteredTickets['created'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['created'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($filteredTickets['resolved'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['resolved'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($filteredTickets['remaining'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['remaining'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            $filteredTickets = $filteredTicketsDetailed;
+
+            // Update totalTickets to match the actual count of remaining tickets
+            $combinedWeek['totalTickets'] = count($filteredTickets['remaining']);
+
             return view('tickets-chart', [
                 'currentWeek' => $combinedWeek,
                 'weekIndex' => 0,
@@ -277,6 +319,48 @@ class TicketChartController extends Controller
             $weekTickets['resolved'] = array_unique($weekTickets['resolved']);
             $weekTickets['remaining'] = array_unique($weekTickets['remaining']);
 
+            // Convert to detailed format with S/N
+            $weekTicketsDetailed = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => []
+            ];
+
+            foreach ($weekTickets['created'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['created'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($weekTickets['resolved'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['resolved'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($weekTickets['remaining'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['remaining'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            $weekTickets = $weekTicketsDetailed;
+
+            // Update totalTickets to match the actual count of remaining tickets
+            $currentWeek['totalTickets'] = count($weekTickets['remaining']);
+
             // Get all weeks for dropdown
             $allWeeks = [];
             foreach ($weeklyData['weeks'] as $index => $week) {
@@ -320,12 +404,34 @@ class TicketChartController extends Controller
             $ticketsByDate = $weeklyData['ticketsByDate'] ?? [];
 
             if ($type === 'created') {
+                $ticketNums = [];
                 foreach ($ticketsByDate as $dateTickets) {
-                    $tickets = array_merge($tickets, $dateTickets['created'] ?? []);
+                    $ticketNums = array_merge($ticketNums, $dateTickets['created'] ?? []);
+                }
+                $ticketNums = array_unique($ticketNums);
+                foreach ($ticketNums as $ticketNum) {
+                    $ticket = $allTickets[$ticketNum] ?? null;
+                    if ($ticket) {
+                        $tickets[] = [
+                            'ticket' => $ticket['smc_ticket'],
+                            'sn' => $ticket['smc_sn'] ?? '',
+                        ];
+                    }
                 }
             } elseif ($type === 'resolved') {
+                $ticketNums = [];
                 foreach ($ticketsByDate as $dateTickets) {
-                    $tickets = array_merge($tickets, $dateTickets['resolved'] ?? []);
+                    $ticketNums = array_merge($ticketNums, $dateTickets['resolved'] ?? []);
+                }
+                $ticketNums = array_unique($ticketNums);
+                foreach ($ticketNums as $ticketNum) {
+                    $ticket = $allTickets[$ticketNum] ?? null;
+                    if ($ticket) {
+                        $tickets[] = [
+                            'ticket' => $ticket['smc_ticket'],
+                            'sn' => $ticket['smc_sn'] ?? '',
+                        ];
+                    }
                 }
             } elseif ($type === 'remaining') {
                 // Remaining = created but not resolved within the filtered range
@@ -349,7 +455,10 @@ class TicketChartController extends Controller
                         }
 
                         if ($inRange && (!$resolvedDate || ($filterEnd && $resolvedDate->gt($filterEnd)))) {
-                            $tickets[] = $ticket['smc_ticket'];
+                            $tickets[] = [
+                                'ticket' => $ticket['smc_ticket'],
+                                'sn' => $ticket['smc_sn'] ?? '',
+                            ];
                         }
                     }
                 }
@@ -365,9 +474,13 @@ class TicketChartController extends Controller
             $tickets = $weekTickets[$type] ?? [];
         }
 
-        // Remove duplicates and sort
-        $tickets = array_values(array_unique($tickets));
-        sort($tickets);
+        // Sort by ticket number
+        usort($tickets, function ($a, $b) {
+            if (is_array($a) && is_array($b)) {
+                return strcmp($a['ticket'] ?? '', $b['ticket'] ?? '');
+            }
+            return strcmp($a ?? '', $b ?? '');
+        });
 
         return response()->json(['tickets' => $tickets]);
     }

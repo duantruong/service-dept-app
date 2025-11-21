@@ -43,10 +43,37 @@ class TicketChartService
         [$createdLabel, $createdIdx] = $findHeader(['ticket date created', 'date created', 'created']);
         [$resolvedLabel, $resolvedIdx] = $findHeader(['resolution date/time', 'resolution date', 'resolved', 'closed']);
         [$smcTicketLabel, $smcTicketIdx] = $findHeader(['smc ticket', 'ticket', 'ticket number', 'ticket id']);
+        [$smcSnLabel, $smcSnIdx] = $findHeader([
+            'supermicro_system_serial_number',
+            'supermicro system serial number',
+            'smc s/n',
+            'smc sn',
+            'serial number',
+            'serial',
+            's/n'
+        ]);
+
+        // If SMC S/N not found by header name, try to find it as the column to the right of "System SKU"
+        if ($smcSnIdx === null) {
+            [$systemSkuLabel, $systemSkuIdx] = $findHeader(['system sku', 'sku']);
+            if ($systemSkuIdx !== null && isset($headers[$systemSkuIdx + 1])) {
+                $smcSnIdx = $systemSkuIdx + 1;
+                $smcSnLabel = $headers[$smcSnIdx];
+            }
+        }
 
         if ($createdIdx === null) {
             throw new \Exception('Could not find Ticket Date Created column.');
         }
+
+        // Log which columns were detected for debugging
+        \Log::info('Detected columns:', [
+            'created' => $createdLabel,
+            'resolved' => $resolvedLabel,
+            'smc_ticket' => $smcTicketLabel,
+            'smc_sn' => $smcSnLabel,
+            'all_headers' => $headers->toArray()
+        ]);
 
         // Improved date parsing function
         $parse = function ($v) {
@@ -95,7 +122,7 @@ class TicketChartService
         $resolvedDaily = [];
         $createdWeekly = [];
         $resolvedWeekly = [];
-        
+
         // Track individual tickets with their SMC Ticket numbers
         $ticketsByDate = []; // ['2025-01-01' => ['created' => ['SMC001', 'SMC002'], 'resolved' => ['SMC001']]]
         $allTickets = []; // Store all ticket data for lookup
@@ -103,6 +130,7 @@ class TicketChartService
         foreach ($rows as $r) {
             $r = collect($r);
             $smcTicket = $smcTicketIdx !== null ? trim((string) ($r->get($smcTicketIdx) ?? '')) : null;
+            $smcSn = $smcSnIdx !== null ? trim((string) ($r->get($smcSnIdx) ?? '')) : null;
 
             // Count tickets created by day and week (only 2025)
             if ($createdIdx !== null && ($val = $r->get($createdIdx)) !== null && $val !== '') {
@@ -117,21 +145,27 @@ class TicketChartService
 
                             $createdDaily[$dayKey] = ($createdDaily[$dayKey] ?? 0) + 1;
                             $createdWeekly[$weekStart] = ($createdWeekly[$weekStart] ?? 0) + 1;
-                            
+
                             // Track ticket number
                             if ($smcTicket) {
                                 if (!isset($ticketsByDate[$dayKey])) {
                                     $ticketsByDate[$dayKey] = ['created' => [], 'resolved' => []];
                                 }
                                 $ticketsByDate[$dayKey]['created'][] = $smcTicket;
-                                
+
                                 // Store ticket info
                                 if (!isset($allTickets[$smcTicket])) {
                                     $allTickets[$smcTicket] = [
                                         'smc_ticket' => $smcTicket,
+                                        'smc_sn' => $smcSn,
                                         'created_date' => $dayKey,
                                         'resolved_date' => null,
                                     ];
+                                } else {
+                                    // Update serial number if not already set or if current one is not empty
+                                    if (empty($allTickets[$smcTicket]['smc_sn']) && !empty($smcSn)) {
+                                        $allTickets[$smcTicket]['smc_sn'] = $smcSn;
+                                    }
                                 }
                             }
                         }
@@ -153,20 +187,25 @@ class TicketChartService
 
                             $resolvedDaily[$dayKey] = ($resolvedDaily[$dayKey] ?? 0) + 1;
                             $resolvedWeekly[$weekStart] = ($resolvedWeekly[$weekStart] ?? 0) + 1;
-                            
+
                             // Track ticket number
                             if ($smcTicket) {
                                 if (!isset($ticketsByDate[$dayKey])) {
                                     $ticketsByDate[$dayKey] = ['created' => [], 'resolved' => []];
                                 }
                                 $ticketsByDate[$dayKey]['resolved'][] = $smcTicket;
-                                
+
                                 // Update ticket info
                                 if (isset($allTickets[$smcTicket])) {
                                     $allTickets[$smcTicket]['resolved_date'] = $dayKey;
+                                    // Update serial number if not already set or if current one is not empty
+                                    if (empty($allTickets[$smcTicket]['smc_sn']) && !empty($smcSn)) {
+                                        $allTickets[$smcTicket]['smc_sn'] = $smcSn;
+                                    }
                                 } else {
                                     $allTickets[$smcTicket] = [
                                         'smc_ticket' => $smcTicket,
+                                        'smc_sn' => $smcSn,
                                         'created_date' => null,
                                         'resolved_date' => $dayKey,
                                     ];

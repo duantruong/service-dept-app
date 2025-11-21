@@ -134,7 +134,18 @@
                                 </div>
                             </div>
                             <div id="ticketListContent" style="display: none;">
-                                <ul class="list-group" id="ticketListItems"></ul>
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>SMC Ticket</th>
+                                                <th>SMC S/N</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ticketListItems">
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                             <div id="ticketListEmpty" style="display: none;" class="alert alert-info">
                                 No tickets found.
