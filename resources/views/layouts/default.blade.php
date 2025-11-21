@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Service Department App</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>SMC Government</title>
+    <link rel="icon" type="images/png" href="images/supermicro-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/main.css') }}">
     @stack('styles')
@@ -23,7 +25,7 @@
                     <img src="{{ asset('images/supermicro-logo.png') }}" alt="Supermicro Logo" class="img-fluid" />
                 </a>
                 <div class="mx-auto">
-                    <h4 class="text-white mb-0">Service Department</h4>
+                    <h4 class="text-white mb-0">Goverment Report</h4>
                 </div>
                 @if(session('logged_in'))
                     <form action="{{ route('logout') }}" method="POST" class="d-flex">

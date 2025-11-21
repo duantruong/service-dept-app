@@ -141,6 +141,8 @@ class TicketChartController extends Controller
             $totalCreated = 0;
             $totalResolved = 0;
             $runningTotal = 0;
+            $ticketsByDate = $weeklyData['ticketsByDate'] ?? [];
+            $allTickets = $weeklyData['allTickets'] ?? [];
 
             // Flatten all daily data while maintaining chronological order
             // Calculate running total across all days sequentially
@@ -175,6 +177,89 @@ class TicketChartController extends Controller
                 'dailyData' => $allDailyData,
             ];
 
+            // Calculate filtered tickets for display
+            $filteredTickets = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => [],
+            ];
+
+            // Collect all created and resolved tickets in filtered range
+            foreach ($ticketsByDate as $dateTickets) {
+                $filteredTickets['created'] = array_merge($filteredTickets['created'], $dateTickets['created'] ?? []);
+                $filteredTickets['resolved'] = array_merge($filteredTickets['resolved'], $dateTickets['resolved'] ?? []);
+            }
+
+            // Calculate remaining tickets
+            $filterStart = $dateFilter['start_date'] ? \Carbon\Carbon::parse($dateFilter['start_date']) : null;
+            $filterEnd = $dateFilter['end_date'] ? \Carbon\Carbon::parse($dateFilter['end_date'])->endOfDay() : null;
+
+            foreach ($allTickets as $ticket) {
+                $createdDate = $ticket['created_date'] ? \Carbon\Carbon::parse($ticket['created_date']) : null;
+                $resolvedDate = $ticket['resolved_date'] ? \Carbon\Carbon::parse($ticket['resolved_date']) : null;
+
+                if ($createdDate) {
+                    $inRange = true;
+                    if ($filterStart && $createdDate->lt($filterStart->startOfDay())) {
+                        $inRange = false;
+                    }
+                    if ($filterEnd && $createdDate->gt($filterEnd)) {
+                        $inRange = false;
+                    }
+
+                    if ($inRange && (!$resolvedDate || ($filterEnd && $resolvedDate->gt($filterEnd)))) {
+                        $filteredTickets['remaining'][] = $ticket['smc_ticket'];
+                    }
+                }
+            }
+
+            // Remove duplicates
+            $filteredTickets['created'] = array_unique($filteredTickets['created']);
+            $filteredTickets['resolved'] = array_unique($filteredTickets['resolved']);
+            $filteredTickets['remaining'] = array_unique($filteredTickets['remaining']);
+
+            // Convert to detailed format with S/N
+            $filteredTicketsDetailed = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => []
+            ];
+
+            foreach ($filteredTickets['created'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['created'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($filteredTickets['resolved'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['resolved'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($filteredTickets['remaining'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $filteredTicketsDetailed['remaining'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            $filteredTickets = $filteredTicketsDetailed;
+
+            // Update totalTickets to match the actual count of remaining tickets
+            $combinedWeek['totalTickets'] = count($filteredTickets['remaining']);
+
             return view('tickets-chart', [
                 'currentWeek' => $combinedWeek,
                 'weekIndex' => 0,
@@ -184,11 +269,97 @@ class TicketChartController extends Controller
                 'dateFilter' => $dateFilter,
                 'isFiltered' => true,
                 'allWeeks' => [], // No weeks list for filtered view
+                'weekTickets' => $filteredTickets,
             ]);
         } else {
             // Normal pagination for unfiltered data
             $weekIndex = max(0, min((int) $week, $totalWeeks - 1));
             $currentWeek = $weeklyData['weeks'][$weekIndex];
+
+            // Get tickets for this week
+            $weekStart = $currentWeek['weekStartFormatted'];
+            $weekEnd = $currentWeek['weekEndFormatted'];
+            $ticketsByDate = $weeklyData['ticketsByDate'] ?? [];
+            $allTickets = $weeklyData['allTickets'] ?? [];
+
+            // Collect tickets for this week
+            $weekTickets = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => [],
+            ];
+
+            $startDate = \Carbon\Carbon::parse($weekStart);
+            $endDate = \Carbon\Carbon::parse($weekEnd);
+
+            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+                $dayKey = $date->toDateString();
+                if (isset($ticketsByDate[$dayKey])) {
+                    $weekTickets['created'] = array_merge($weekTickets['created'], $ticketsByDate[$dayKey]['created'] ?? []);
+                    $weekTickets['resolved'] = array_merge($weekTickets['resolved'], $ticketsByDate[$dayKey]['resolved'] ?? []);
+                }
+            }
+
+            // Get remaining tickets (created but not resolved in this week, or created before and still open)
+            foreach ($allTickets as $ticket) {
+                $createdDate = $ticket['created_date'] ? \Carbon\Carbon::parse($ticket['created_date']) : null;
+                $resolvedDate = $ticket['resolved_date'] ? \Carbon\Carbon::parse($ticket['resolved_date']) : null;
+
+                // Ticket is remaining if:
+                // 1. Created before or during this week AND (not resolved OR resolved after this week)
+                if ($createdDate && $createdDate->lte($endDate)) {
+                    if (!$resolvedDate || $resolvedDate->gt($endDate)) {
+                        $weekTickets['remaining'][] = $ticket['smc_ticket'];
+                    }
+                }
+            }
+
+            // Remove duplicates
+            $weekTickets['created'] = array_unique($weekTickets['created']);
+            $weekTickets['resolved'] = array_unique($weekTickets['resolved']);
+            $weekTickets['remaining'] = array_unique($weekTickets['remaining']);
+
+            // Convert to detailed format with S/N
+            $weekTicketsDetailed = [
+                'created' => [],
+                'resolved' => [],
+                'remaining' => []
+            ];
+
+            foreach ($weekTickets['created'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['created'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($weekTickets['resolved'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['resolved'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            foreach ($weekTickets['remaining'] as $ticketNum) {
+                $ticket = $allTickets[$ticketNum] ?? null;
+                if ($ticket) {
+                    $weekTicketsDetailed['remaining'][] = [
+                        'ticket' => $ticket['smc_ticket'],
+                        'sn' => $ticket['smc_sn'] ?? '',
+                    ];
+                }
+            }
+
+            $weekTickets = $weekTicketsDetailed;
+
+            // Update totalTickets to match the actual count of remaining tickets
+            $currentWeek['totalTickets'] = count($weekTickets['remaining']);
 
             // Get all weeks for dropdown
             $allWeeks = [];
@@ -209,7 +380,108 @@ class TicketChartController extends Controller
                 'dateFilter' => $dateFilter,
                 'isFiltered' => false,
                 'allWeeks' => $allWeeks,
+                'weekTickets' => $weekTickets,
             ]);
         }
+    }
+
+    public function getTickets(Request $request)
+    {
+        $type = $request->input('type'); // 'created', 'resolved', or 'remaining'
+        $weekIndex = (int) $request->input('week', 0);
+        $isFiltered = $request->input('filtered', false);
+
+        $weeklyData = session('ticket_weekly_data');
+        if (!$weeklyData) {
+            return response()->json(['tickets' => []]);
+        }
+
+        $tickets = [];
+
+        if ($isFiltered) {
+            // For filtered view, get tickets from all dates
+            $allTickets = $weeklyData['allTickets'] ?? [];
+            $ticketsByDate = $weeklyData['ticketsByDate'] ?? [];
+
+            if ($type === 'created') {
+                $ticketNums = [];
+                foreach ($ticketsByDate as $dateTickets) {
+                    $ticketNums = array_merge($ticketNums, $dateTickets['created'] ?? []);
+                }
+                $ticketNums = array_unique($ticketNums);
+                foreach ($ticketNums as $ticketNum) {
+                    $ticket = $allTickets[$ticketNum] ?? null;
+                    if ($ticket) {
+                        $tickets[] = [
+                            'ticket' => $ticket['smc_ticket'],
+                            'sn' => $ticket['smc_sn'] ?? '',
+                        ];
+                    }
+                }
+            } elseif ($type === 'resolved') {
+                $ticketNums = [];
+                foreach ($ticketsByDate as $dateTickets) {
+                    $ticketNums = array_merge($ticketNums, $dateTickets['resolved'] ?? []);
+                }
+                $ticketNums = array_unique($ticketNums);
+                foreach ($ticketNums as $ticketNum) {
+                    $ticket = $allTickets[$ticketNum] ?? null;
+                    if ($ticket) {
+                        $tickets[] = [
+                            'ticket' => $ticket['smc_ticket'],
+                            'sn' => $ticket['smc_sn'] ?? '',
+                        ];
+                    }
+                }
+            } elseif ($type === 'remaining') {
+                // Remaining = created but not resolved within the filtered range
+                // For filtered view, we need to check tickets created in range that weren't resolved
+                $dateFilter = session('ticket_date_filter', ['start_date' => null, 'end_date' => null]);
+                $filterStart = $dateFilter['start_date'] ? \Carbon\Carbon::parse($dateFilter['start_date']) : null;
+                $filterEnd = $dateFilter['end_date'] ? \Carbon\Carbon::parse($dateFilter['end_date'])->endOfDay() : null;
+
+                foreach ($allTickets as $ticket) {
+                    $createdDate = $ticket['created_date'] ? \Carbon\Carbon::parse($ticket['created_date']) : null;
+                    $resolvedDate = $ticket['resolved_date'] ? \Carbon\Carbon::parse($ticket['resolved_date']) : null;
+
+                    // Ticket is remaining if created in range and (not resolved OR resolved after range end)
+                    if ($createdDate) {
+                        $inRange = true;
+                        if ($filterStart && $createdDate->lt($filterStart->startOfDay())) {
+                            $inRange = false;
+                        }
+                        if ($filterEnd && $createdDate->gt($filterEnd)) {
+                            $inRange = false;
+                        }
+
+                        if ($inRange && (!$resolvedDate || ($filterEnd && $resolvedDate->gt($filterEnd)))) {
+                            $tickets[] = [
+                                'ticket' => $ticket['smc_ticket'],
+                                'sn' => $ticket['smc_sn'] ?? '',
+                            ];
+                        }
+                    }
+                }
+            }
+        } else {
+            // For weekly view, use the pre-calculated week tickets
+            $weekTicketsParam = $request->input('weekTickets');
+            if (is_string($weekTicketsParam)) {
+                $weekTickets = json_decode($weekTicketsParam, true) ?? [];
+            } else {
+                $weekTickets = $weekTicketsParam ?? [];
+            }
+            $tickets = $weekTickets[$type] ?? [];
+        }
+
+        // Sort by ticket number
+        usort($tickets, function ($a, $b) {
+            if (is_array($a) && is_array($b)) {
+                return strcmp($a['ticket'] ?? '', $b['ticket'] ?? '');
+            }
+            return strcmp($a ?? '', $b ?? '');
+        });
+
+        return response()->json(['tickets' => $tickets]);
     }
 }

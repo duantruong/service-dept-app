@@ -1,5 +1,7 @@
 // Wait for DOM and Highcharts to be ready
-function initTicketChart() {
+
+function initTicketChart() { 
+    //let start = Date.now()
     try {
         // Get current week data from the page
         const currentWeekData = window.ticketChartData;
@@ -18,11 +20,32 @@ function initTicketChart() {
 
         // Prepare daily data
         const dailyData = currentWeekData.dailyData;
-        const categories = dailyData.map(day => day.day + '<br>' + day.date);
+        const isFiltered = window.isFiltered || false;
+        
+        // Format categories based on whether it's filtered or not
+        let categories;
+        if (isFiltered) {
+            // For filtered results, show dates (format: "Jan 1" or "Jan 1<br>2025")
+            categories = dailyData.map(day => {
+                // Use dateFull to format properly
+                if (day.dateFull) {
+                    const dateObj = new Date(day.dateFull);
+                    const month = dateObj.toLocaleDateString('en-US', { month: 'short' });
+                    const dayNum = dateObj.getDate();
+                    return month + ' ' + dayNum;
+                }
+                return day.date; // Fallback to existing date format
+            });
+        } else {
+            // For weekly view, show day name + date
+            categories = dailyData.map(day => day.day + '<br>' + day.date);
+        }
+        
         const createdData = dailyData.map(day => day.created);
         const resolvedData = dailyData.map(day => day.resolved);
         const totalData = dailyData.map(day => day.totalTickets);
-
+        //let end = Date.time()
+        //console.log(end-start)
         // Render the chart
         Highcharts.chart('container', {
             chart: {
@@ -58,13 +81,14 @@ function initTicketChart() {
             xAxis: {
                 categories: categories,
                 title: {
-                    text: 'Days of Week (Monday - Sunday)'
+                    text: isFiltered ? 'Date' : 'Days of Week (Monday - Sunday)'
                 },
                 labels: {
-                    rotation: 0,
+                    rotation: isFiltered ? -45 : 0,
                     style: {
                         fontSize: '11px'
-                    }
+                    },
+                    step: isFiltered ? Math.ceil(categories.length / 20) : 1 // Show every nth label if too many dates
                 }
             },
             yAxis: {
@@ -136,6 +160,7 @@ function initTicketChart() {
             container.innerHTML = '<div class="alert alert-danger text-center p-3">Error rendering chart: ' + error.message + '</div>';
         }
     }
+
 }
 
 // Wait for Highcharts to load, then initialize chart
