@@ -27,7 +27,14 @@ jobs:
           cache: "npm"
 
       - name: Install Composer dependencies
-        run: composer install --no-dev --optimize-autoloader --no-interaction
+        run: |
+          # Ensure lock file is compatible with PHP 8.2
+          composer install --no-dev --optimize-autoloader --no-interaction || {
+            echo "Composer install failed, updating zipstream-php to compatible version..."
+            composer require maennchen/zipstream-php:~3.1.0 --no-update --no-interaction
+            composer update maennchen/zipstream-php --with-dependencies --no-interaction
+            composer install --no-dev --optimize-autoloader --no-interaction
+          }
 
       - name: Install NPM dependencies
         run: npm ci
