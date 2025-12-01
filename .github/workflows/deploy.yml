@@ -102,6 +102,11 @@ jobs:
             set -e
             cd ${EC2_DEPLOY_PATH}
             
+            # Ensure lock file is compatible with PHP 8.2
+            echo "Ensuring composer.lock compatibility..."
+            composer require maennchen/zipstream-php:~3.1.0 --no-update --no-interaction || true
+            composer update maennchen/zipstream-php --with-dependencies --no-interaction --lock || true
+            
             # Install Composer dependencies
             composer install --no-dev --optimize-autoloader --no-interaction
             
