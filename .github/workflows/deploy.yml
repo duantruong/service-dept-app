@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to ensure we have the latest
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -26,15 +28,35 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install Composer dependencies
+      - name: Verify composer files
         run: |
-          # Ensure lock file is compatible with PHP 8.2
-          composer install --no-dev --optimize-autoloader --no-interaction || {
-            echo "Composer install failed, updating zipstream-php to compatible version..."
+          echo "Checking composer.json:"
+          grep -A 1 "maennchen/zipstream-php" composer.json || echo "Not found in composer.json"
+          echo ""
+          echo "Checking composer.lock version:"
+          grep -A 2 '"name": "maennchen/zipstream-php"' composer.lock | grep version || echo "Not found in composer.lock"
+          echo ""
+          echo "Current commit:"
+          git rev-parse HEAD
+          echo ""
+          echo "Composer.lock file size:"
+          ls -lh composer.lock
+
+      - name: Fix composer.lock if needed
+        run: |
+          # Check if lock file has incompatible version
+          if grep -q '"version": "3.2.0"' composer.lock 2>/dev/null; then
+            echo "Lock file has 3.2.0, updating to 3.1.2..."
             composer require maennchen/zipstream-php:~3.1.0 --no-update --no-interaction
-            composer update maennchen/zipstream-php --with-dependencies --no-interaction
-            composer install --no-dev --optimize-autoloader --no-interaction
-          }
+            composer update maennchen/zipstream-php --with-dependencies --no-interaction --lock
+            echo "Updated lock file:"
+            grep -A 2 '"name": "maennchen/zipstream-php"' composer.lock | grep version
+          else
+            echo "Lock file version is correct"
+          fi
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction
 
       - name: Install NPM dependencies
         run: npm ci
