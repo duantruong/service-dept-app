@@ -44,33 +44,12 @@ function initTicketChart() {
         const totalData = dailyData.map(day => day.totalTickets);
 
         // Render the chart
-        Highcharts.chart('container', {
+        const chartInstance = Highcharts.chart('container', {
             chart: {
                 width: null,
                 spacingBottom: 30,
                 spacingRight: 20,
-                spacingLeft: 60,
-                events: {
-                    load: function() {
-                        // Add watermark in bottom-right corner
-                        const watermarkText = 'developed by Duan Truong from Service Team';
-                        const textElement = this.renderer.text(
-                            watermarkText,
-                            this.chartWidth - 20,
-                            this.chartHeight - 10
-                        )
-                        .attr({
-                            align: 'right'
-                        })
-                        .css({
-                            color: '#999999',
-                            fontSize: '11px',
-                            opacity: 0.6,
-                            fontStyle: 'italic'
-                        })
-                        .add();
-                    }
-                }
+                spacingLeft: 60
             },
             title: {
                 text: 'Ticket Movement for Week: ' + currentWeekData.weekLabel
@@ -128,7 +107,7 @@ function initTicketChart() {
                     color: '#dc3545'
                 },
                 {
-                    name: 'Total Tickets',
+                    name: 'Remaining Tickets',
                     type: 'line',
                     data: totalData,
                     color: '#198754',
@@ -140,6 +119,28 @@ function initTicketChart() {
             ],
             credits: {
                 enabled: false
+            },
+            exporting: {
+                enabled: true,
+                buttons: {
+                    contextButton: {
+                        enabled: false // Disable default export menu
+                    }
+                },
+                menuItemDefinitions: {
+                    downloadPNG: {
+                        text: 'Download PNG image'
+                    },
+                    downloadJPEG: {
+                        text: 'Download JPEG image'
+                    },
+                    downloadPDF: {
+                        text: 'Download PDF document'
+                    },
+                    downloadSVG: {
+                        text: 'Download SVG vector image'
+                    }
+                }
             }
         }, function (chart) {
             if (!chart || !chart.series || chart.series.length === 0) {
