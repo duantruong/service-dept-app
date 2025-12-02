@@ -161,14 +161,14 @@
             <div id="container" class="chart-container"></div>
 
             @if(!isset($isFiltered) || !$isFiltered)
-                <div class="d-flex justify-content-between align-items-center mt-4">
-                    <div>
+                <div class="d-flex justify-content-center align-items-center mt-4 position-relative">
+                    <div class="position-absolute start-0">
                         @if($hasPrevious)
                             <a href="{{ route('tickets.chart', ['week' => $weekIndex - 1]) }}" class="btn btn-secondary">
-                                ← Previous Week
+                                ← Prev Week
                             </a>
                         @else
-                            <button class="btn btn-secondary" disabled>← Previous Week</button>
+                            <button class="btn btn-secondary" disabled>← Prev Week</button>
                         @endif
                     </div>
 
@@ -191,7 +191,7 @@
                         </div>
                     </div>
 
-                    <div>
+                    <div class="position-absolute end-0">
                         @if($hasNext)
                             <a href="{{ route('tickets.chart', ['week' => $weekIndex + 1]) }}" class="btn btn-secondary">
                                 Next Week →
@@ -220,6 +220,8 @@
 
     @push('scripts')
         <script src="https://code.highcharts.com/highcharts.js"></script>
+        <script src="https://code.highcharts.com/modules/exporting.js"></script>
+        <script src="https://code.highcharts.com/modules/offline-exporting.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script src="{{ asset('js/chart-data.js') }}"></script>
         <script>

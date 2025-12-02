@@ -40,15 +40,15 @@ jobs:
           echo "Current commit:"
           git rev-parse HEAD
           echo ""
-          
+
           # Always ensure the lock file is compatible with PHP 8.2
           echo "=== Ensuring lock file compatibility ==="
           # Update composer.json constraint if needed
           composer require maennchen/zipstream-php:~3.1.0 --no-update --no-interaction
-          
+
           # Update the lock file to match the constraint
           composer update maennchen/zipstream-php --with-dependencies --no-interaction --lock
-          
+
           echo "=== After update ==="
           echo "composer.lock version:"
           grep -A 2 '"name": "maennchen/zipstream-php"' composer.lock | grep version || echo "Not found"
