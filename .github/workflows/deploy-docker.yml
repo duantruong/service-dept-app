@@ -1,0 +1,86 @@
+name: Deploy to EC2 with Docker
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy files to EC2
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_DEPLOY_PATH: ${{ secrets.EC2_DEPLOY_PATH || '/var/www/html' }}
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='.env' \
+            --exclude='storage/logs/*' \
+            --exclude='storage/framework/cache/*' \
+            --exclude='storage/framework/sessions/*' \
+            --exclude='storage/framework/views/*' \
+            --exclude='bootstrap/cache/*' \
+            --exclude='.github' \
+            --exclude='tests' \
+            --exclude='.gitignore' \
+            --exclude='README.md' \
+            --exclude='DEPLOYMENT.md' \
+            ./ ${EC2_USER}@${EC2_HOST}:${EC2_DEPLOY_PATH}/
+
+      - name: Deploy with Docker on EC2
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_DEPLOY_PATH: ${{ secrets.EC2_DEPLOY_PATH || '/var/www/html' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} bash << 'ENDSSH'
+            set -e
+            cd ${EC2_DEPLOY_PATH}
+            
+            # Create .env file if it doesn't exist
+            if [ ! -f .env ]; then
+              cp .env.example .env
+              php artisan key:generate
+            fi
+            
+            # Stop existing containers
+            docker-compose -f docker-compose.prod.yml down || true
+            
+            # Build and start containers
+            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Run Laravel setup commands inside the app container
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force || true
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan config:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan route:cache
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan view:cache
+            
+            # Set permissions
+            docker-compose -f docker-compose.prod.yml exec -T app chown -R www-data:www-data /var/www/html
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/html/storage
+            docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/html/bootstrap/cache
+            
+            echo "Deployment completed successfully!"
+          ENDSSH
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
