@@ -51,7 +51,7 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_DEPLOY_PATH: ${{ secrets.EC2_DEPLOY_PATH || '/var/www/html' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} bash << 'ENDSSH'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} bash << EOF
             set -e
             cd ${EC2_DEPLOY_PATH}
             
@@ -79,7 +79,7 @@ jobs:
             docker-compose -f docker-compose.prod.yml exec -T app chmod -R 775 /var/www/html/bootstrap/cache
             
             echo "Deployment completed successfully!"
-          ENDSSH
+          EOF
 
       - name: Cleanup
         if: always()
