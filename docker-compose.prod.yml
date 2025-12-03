@@ -16,9 +16,9 @@ services:
       APP_DEBUG: false
       DB_HOST: db
       DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE:-service_dept_app}
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: service_dept_app
+      DB_USERNAME: root
+      DB_PASSWORD: root
     depends_on:
       - db
     networks:
@@ -44,10 +44,10 @@ services:
     container_name: laravel-db-prod
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_DATABASE:-service_dept_app}
-      MYSQL_USER: ${DB_USERNAME:-root}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-${DB_PASSWORD}}
+      MYSQL_DATABASE: service_dept_app
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: root
     volumes:
       - db_data:/var/lib/mysql
     networks:

@@ -53,12 +53,26 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} bash << EOF
             set -e
-            cd ${EC2_DEPLOY_PATH}
-            
+            echo "Changing directory to: ${EC2_DEPLOY_PATH}"
+            cd "${EC2_DEPLOY_PATH}"
+
+            echo "Current directory:"
+            pwd
+            echo "Files here:"
+            ls
+
             # Create .env file if it doesn't exist
             if [ ! -f .env ]; then
-              cp .env.example .env
-              php artisan key:generate
+              if [ -f .env.example ]; then
+                echo ".env not found, but .env.example exists. Creating .env..."
+                cp .env.example .env
+                php artisan key:generate || echo "php artisan key:generate failed (is PHP/Laravel available here?)"
+              else
+                echo "WARNING: .env and .env.example not found in ${EC2_DEPLOY_PATH}"
+                echo "Make sure your Laravel app root (where .env.example lives) is the same as EC2_DEPLOY_PATH."
+              fi
+            else
+              echo ".env file already exists, skipping creation"
             fi
             
             # Stop existing containers
