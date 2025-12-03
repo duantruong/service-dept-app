@@ -77,3 +77,120 @@ This means the SSH key authentication is failing. Follow these steps:
     - `EC2_USER`: `ubuntu` (for Ubuntu instances)
     - `EC2_SSH_KEY`: Your complete private key
     - `EC2_DEPLOY_PATH`: `/var/www/html` (optional)
+
+---
+
+## Issue: Cannot Access Application in Browser
+
+### Step 1: Check Security Group
+
+1. Go to AWS Console → EC2 → Security Groups
+2. Select your EC2 instance's security group
+3. **Inbound Rules** should allow:
+    - **HTTP (port 80)** from `0.0.0.0/0` (or your IP)
+    - **HTTPS (port 443)** from `0.0.0.0/0` (optional)
+    - **SSH (port 22)** from your IP (for security)
+
+### Step 2: Check if Containers are Running
+
+SSH into EC2 and run:
+
+```bash
+ssh -i ~/.ssh/ec2_deploy_key ubuntu@54.188.81.175
+cd /var/www/html
+docker-compose -f docker-compose.prod.yml ps
+```
+
+You should see 3 containers running:
+
+-   `laravel-app-prod` (status: Up)
+-   `laravel-web-prod` (status: Up)
+-   `laravel-db-prod` (status: Up)
+
+### Step 3: Check Container Logs
+
+```bash
+# Check all containers
+docker-compose -f docker-compose.prod.yml logs
+
+# Check specific container
+docker-compose -f docker-compose.prod.yml logs web
+docker-compose -f docker-compose.prod.yml logs app
+docker-compose -f docker-compose.prod.yml logs db
+```
+
+### Step 4: Check if Port 80 is Listening
+
+```bash
+sudo netstat -tlnp | grep :80
+# or
+sudo ss -tlnp | grep :80
+```
+
+You should see something like:
+
+```
+tcp  0  0  0.0.0.0:80  0.0.0.0:*  LISTEN  <PID>/docker-proxy
+```
+
+### Step 5: Test from EC2 Itself
+
+```bash
+curl http://localhost
+# or
+curl http://127.0.0.1
+```
+
+If this works, the app is running but security group might be blocking external access.
+
+### Step 6: Check .env File
+
+```bash
+cat /var/www/html/.env | grep APP_URL
+```
+
+Make sure `APP_URL` is set correctly:
+
+```env
+APP_URL=http://54.188.81.175
+```
+
+### Step 7: Restart Containers
+
+```bash
+cd /var/www/html
+docker-compose -f docker-compose.prod.yml restart
+# or
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Step 8: Check Nginx Configuration
+
+```bash
+docker-compose -f docker-compose.prod.yml exec web nginx -t
+```
+
+### Common Fixes:
+
+1. **Security Group Not Configured**
+
+    - Add HTTP (port 80) rule in AWS Console
+
+2. **Containers Not Running**
+
+    - Check logs: `docker-compose -f docker-compose.prod.yml logs`
+    - Restart: `docker-compose -f docker-compose.prod.yml restart`
+
+3. **Wrong APP_URL**
+
+    - Update `.env`: `APP_URL=http://54.188.81.175`
+
+4. **Port Conflict**
+
+    - Check if another service is using port 80: `sudo lsof -i :80`
+    - Stop conflicting service or change Docker port mapping
+
+5. **Database Connection Issues**
+    - Check `.env` has correct DB credentials
+    - Check DB container is running: `docker-compose -f docker-compose.prod.yml ps db`
