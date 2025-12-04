@@ -45,9 +45,9 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: service_dept_app
-      MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: laravel_user
+      MYSQL_PASSWORD: userpassword123
+      MYSQL_ROOT_PASSWORD: rootpassword123
     volumes:
       - db_data:/var/lib/mysql
     networks:
